@@ -3,6 +3,7 @@ import java.awt.event.MouseListener;
 
 public class MouseHandler implements MouseListener {
     public boolean shooting = false;
+    public boolean tagging = false;
     @Override
     public void mouseClicked(MouseEvent e) {
 
@@ -19,12 +20,24 @@ public class MouseHandler implements MouseListener {
                 shooting = false;
             }
         }
+
+        if (e.getButton() == MouseEvent.BUTTON3) {
+            tagging = true;
+        }
+
+        else {
+            tagging = false;
+        }
     }
 
     @Override
     public void mouseReleased(MouseEvent e) {
         if (e.getButton() == MouseEvent.BUTTON1) {
             shooting = false;
+        }
+
+        else if (e.getButton() == MouseEvent.BUTTON3) {
+            tagging = false;
         }
 
     }

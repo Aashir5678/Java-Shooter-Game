@@ -19,11 +19,13 @@ public class GamePanel extends JPanel implements Runnable{
     final int screenHeight = 600;
     final int playerWidth = 60; // 60
     final int playerHeight = 80; // 80
-    final int playerVelocity = 5;
-    final int FPS = 60;
+    int playerVelocity = 5;
+    private int fps = 60;
     final int spawnRate = 100;
     final double recoilFactor = 9.3;
     final double playerRecoil = 0.3;
+    final int deadEyeLength = 10 * 60;
+    final int deadEyeXSize = 15;
     final double gunCooldown = 3.5; // Can only be whole multiples of 0.5 >= 1
     final int spawnRadius = 300;
 
@@ -38,11 +40,17 @@ public class GamePanel extends JPanel implements Runnable{
     Gun gun = new Gun(playerCenterX, playerCenterY, gunCooldown);
     List<Bullet> bullets = new ArrayList<Bullet>();
     List<Enemy> enemies = new ArrayList<Enemy>();
+    List<int[]> deadEyeTags = new ArrayList<int[]>();
+    public int deadEyeTimer = 0;
+    public int maxTags = 5; // Max amount of dead eye tags allowed
+
     public int removeBulletIndex;
     public int removeEnemyIndex;
     public boolean recoil = true;
+    public boolean canDeadEye;
     public long startTime = 0;
     public double gunX, gunY;
+    public static PointerInfo mouseInfo;
     public int recoilDeltaX, recoilDeltaY;
 
     final Color backgroundColor = new Color(200, 200, 200);
@@ -72,12 +80,38 @@ public class GamePanel extends JPanel implements Runnable{
         long elapsedTime;
         Random rand = new Random();
 
-        PointerInfo mouseInfo;
-
         while (gameThread != null) {
             startTime = System.currentTimeMillis();
+            if (keyHandler.deadEye) {
+                deadEyeTimer += 1;
+                if (deadEyeTimer > deadEyeLength) {
+                    keyHandler.deadEye = false;
+                    deadEyeTimer = 0;
+                    deadEyeTags.clear();
+                }
+            }
+
+            if (keyHandler.deadEye && playerVelocity != 0) {
+                for (Enemy enemy : enemies) {
+                    enemy.enemyVelocity = 0.8;
+                }
+
+                playerVelocity = 0;
+                
+            }
+
+            else if (!keyHandler.deadEye && playerVelocity == 0) {
+                playerVelocity = 5;
+
+                for (Enemy enemy : enemies) {
+                    enemy.enemyVelocity = 5.0;
+                }
+
+                deadEyeTags.clear();
+            }
 
             mouseInfo = MouseInfo.getPointerInfo();
+
 
             gun.pointAtMouse(mouseInfo.getLocation().x, mouseInfo.getLocation().y);
 
@@ -92,7 +126,7 @@ public class GamePanel extends JPanel implements Runnable{
             elapsedTime = endTime - startTime;
 
             try {
-                Thread.sleep((1000/FPS) - elapsedTime);
+                Thread.sleep((1000/fps) - elapsedTime);
             }
 
             catch (InterruptedException e){
@@ -114,8 +148,14 @@ public class GamePanel extends JPanel implements Runnable{
 
         int enemyX = rand.nextInt(screenWidth);
         int enemyY = rand.nextInt(screenHeight);
+        Enemy enemy;
+
         if (euclidDist(enemyX, enemyY, playerCenterX, playerCenterY) >= spawnRadius) {
-            enemies.add(new Enemy(enemyX, enemyY));
+            enemy = new Enemy(enemyX, enemyY);
+            if (keyHandler.deadEye) {
+                enemy.enemyVelocity = 0.8;
+            }
+            enemies.add(enemy);
         }
 
     }
@@ -126,7 +166,15 @@ public class GamePanel extends JPanel implements Runnable{
 
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
+
         Graphics2D g2D = (Graphics2D) g; // Type cast
+        if (keyHandler.deadEye) {
+            this.setBackground(new Color(255, 130, 0));
+        }
+
+        else {
+            this.setBackground(new Color(255, 255, 255));
+        }
 
         if (!bullets.isEmpty()) {
             g2D.setColor(bullets.get(0).bulletColor);
@@ -152,62 +200,85 @@ public class GamePanel extends JPanel implements Runnable{
         g2D.rotate(gun.gunAngle);
         g2D.translate(-playerCenterX, -playerCenterY);
 
+        // Recoil control
 
-        if (recoil && startTime % gunCooldown == 0 && mouseHandler.shooting) {
-            recoilDeltaX = (int) Math.abs(recoilFactor * Math.cos(gun.gunAngle));
-            recoilDeltaY = (int) Math.abs(recoilFactor * Math.sin(gun.gunAngle));
-
-            if (gun.gunAngle >= 0 && gun.gunAngle <= Math.PI / 2) { // Bottom right quadrant
-                gunX = playerCenterX - recoilDeltaX;
-                gunY = playerCenterY - recoilDeltaY;
-
-                playerX -= (int) recoilDeltaX * playerRecoil;
-                playerY -= (int) recoilDeltaY * playerRecoil;
-
+        if (!keyHandler.deadEye) {
+            if (recoil && startTime % gunCooldown == 0 && mouseHandler.shooting) {
+                recoilDeltaX = (int) Math.abs(recoilFactor * Math.cos(gun.gunAngle));
+                recoilDeltaY = (int) Math.abs(recoilFactor * Math.sin(gun.gunAngle));
+    
+                if (gun.gunAngle >= 0 && gun.gunAngle <= Math.PI / 2) { // Bottom right quadrant
+                    gunX = playerCenterX - recoilDeltaX;
+                    gunY = playerCenterY - recoilDeltaY;
+    
+                    playerX -= (int) recoilDeltaX * playerRecoil;
+                    playerY -= (int) recoilDeltaY * playerRecoil;
+    
+                }
+    
+                else if (gun.gunAngle <= Math.PI && gun.gunAngle >= Math.PI / 2) { // Bottom left quadrant
+                    gunX = playerCenterX + (recoilDeltaX);
+                    gunY = playerCenterY - (recoilDeltaY);
+    
+                    playerX += (int) recoilDeltaX * playerRecoil;
+                    playerY -= (int) recoilDeltaY * playerRecoil;
+    
+                }
+    
+                else if (gun.gunAngle <= -Math.PI / 2  && gun.gunAngle >= -Math.PI) { // Top left quadrant
+                    gunX = playerCenterX + (recoilDeltaX);
+                    gunY = playerCenterY + (recoilDeltaY);
+    
+                    playerX += (int) recoilDeltaX * playerRecoil;
+                    playerY += (int) recoilDeltaY * playerRecoil;
+    
+    
+                }
+    
+                else { // Top right quadrant
+                    gunX = playerCenterX - (recoilDeltaX);
+                    gunY = playerCenterY + (recoilDeltaY);
+    
+                    playerX -= (int) recoilDeltaX * playerRecoil;
+                    playerY += (int) recoilDeltaY * playerRecoil;
+    
+                }
+    
+                playerCenterX = playerX + (playerWidth / 2);
+                playerCenterY = playerY + (playerHeight / 2);
+    
+                g2D.fillRect((int) (gunX - (gun.gunWidth / 2)), (int) (gunY - (gun.gunHeight / 2)), gun.gunWidth, gun.gunHeight);
+    
             }
-
-            else if (gun.gunAngle <= Math.PI && gun.gunAngle >= Math.PI / 2) { // Bottom left quadrant
-                gunX = playerCenterX + (recoilDeltaX);
-                gunY = playerCenterY - (recoilDeltaY);
-
-                playerX += (int) recoilDeltaX * playerRecoil;
-                playerY -= (int) recoilDeltaY * playerRecoil;
-
+    
+            else {
+                g2D.fillRect(playerCenterX - (gun.gunWidth / 2), playerCenterY - (gun.gunHeight / 2), gun.gunWidth, gun.gunHeight);
             }
-
-            else if (gun.gunAngle <= -Math.PI / 2  && gun.gunAngle >= -Math.PI) { // Top left quadrant
-                gunX = playerCenterX + (recoilDeltaX);
-                gunY = playerCenterY + (recoilDeltaY);
-
-                playerX += (int) recoilDeltaX * playerRecoil;
-                playerY += (int) recoilDeltaY * playerRecoil;
-
-
-            }
-
-            else { // Top right quadrant
-                gunX = playerCenterX - (recoilDeltaX);
-                gunY = playerCenterY + (recoilDeltaY);
-
-                playerX -= (int) recoilDeltaX * playerRecoil;
-                playerY += (int) recoilDeltaY * playerRecoil;
-
-            }
-
-            playerCenterX = playerX + (playerWidth / 2);
-            playerCenterY = playerY + (playerHeight / 2);
-
-            g2D.fillRect((int) (gunX - (gun.gunWidth / 2)), (int) (gunY - (gun.gunHeight / 2)), gun.gunWidth, gun.gunHeight);
-
         }
 
         else {
             g2D.fillRect(playerCenterX - (gun.gunWidth / 2), playerCenterY - (gun.gunHeight / 2), gun.gunWidth, gun.gunHeight);
+            int x, y;
+
+            // Draw the x's marked from dead eye
+            for (int[] tags : deadEyeTags) {
+                x = tags[0];
+                y = tags[1];
+                drawX(x, y, g2D);
+
+            }
         }
 
 
         g2D.dispose();
 
+    }
+
+    public void drawX(int x, int y, Graphics2D g2D) {
+        g2D.setColor(new Color(255, 0, 0));
+        g2D.setStroke(new BasicStroke(10));
+        g2D.drawLine(x - (deadEyeXSize / 2), y - (deadEyeXSize / 2), x + (deadEyeXSize / 2), y + (deadEyeXSize / 2));
+        g2D.drawLine(x - (deadEyeXSize / 2), y + (deadEyeXSize / 2), x + (deadEyeXSize / 2), y - (deadEyeXSize / 2));
     }
 
     public void update() {
@@ -231,10 +302,17 @@ public class GamePanel extends JPanel implements Runnable{
         gun.playerY = playerCenterY;
 
 
-        if (mouseHandler.shooting && startTime % gun.cooldown == 0) {
+        if (mouseHandler.shooting && startTime % gun.cooldown == 0 && !keyHandler.deadEye) {
             Bullet bullet = new Bullet(playerCenterX, playerCenterY, gun.gunAngle);
             bullets.add(bullet);
 
+        }
+
+        else if (mouseHandler.tagging && keyHandler.deadEye) {
+            int[] point = new int[] {mouseInfo.getLocation().x, mouseInfo.getLocation().y};
+            if (!deadEyeTags.contains(point) && deadEyeTags.size() <= maxTags) {
+                deadEyeTags.add(point);
+            }
         }
 
         if (!bullets.isEmpty()) {

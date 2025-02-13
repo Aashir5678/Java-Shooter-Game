@@ -6,7 +6,7 @@ public class Enemy {
     public int centerX;
     public int centerY;
     public final int size = 20;
-    public final double enemyVelocity = 5.0;
+    public double enemyVelocity = 5.0;
     public final Color enemyColor = new Color(0, 100, 0);
 
     public Enemy(int x, int y) {
