@@ -6,12 +6,13 @@ public class Enemy {
     public int centerX;
     public int centerY;
     public final int size = 20;
-    public double enemyVelocity = 5.0;
+    public double enemyVelocity = 1.2;
     public final Color enemyColor = new Color(0, 100, 0);
 
-    public Enemy(int x, int y) {
+    public Enemy(int x, int y, double velocity) {
         this.x = x;
         this.y = y;
+        this.enemyVelocity = velocity;
 
         this.centerX = this.x + (this.size / 2);
         this.centerY = this.y + (this.size / 2);

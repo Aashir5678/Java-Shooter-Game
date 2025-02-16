@@ -4,6 +4,7 @@ import java.awt.event.MouseListener;
 public class MouseHandler implements MouseListener {
     public boolean shooting = false;
     public boolean tagging = false;
+
     @Override
     public void mouseClicked(MouseEvent e) {
 
@@ -14,6 +15,7 @@ public class MouseHandler implements MouseListener {
         if (e.getButton() == MouseEvent.BUTTON1) {
             if (!shooting) {
                 shooting = true;
+
             }
 
             else {
@@ -27,6 +29,14 @@ public class MouseHandler implements MouseListener {
 
         else {
             tagging = false;
+        }
+
+        try {
+            Thread.sleep(50);
+        }
+
+        catch (InterruptedException error) {
+            System.out.println("error");
         }
     }
 
